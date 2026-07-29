@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { listen } from "@tauri-apps/api/event";
 import "./App.css";
 import { AccountSummaryPanel } from "./components/AccountSummaryPanel";
 import { ActivityLogPanel } from "./components/ActivityLogPanel";
@@ -21,8 +22,8 @@ import { useSettings } from "./hooks/useSettings";
 import { useTheme } from "./hooks/useTheme";
 import { useWatchlistGroups } from "./hooks/useWatchlistGroups";
 import { loadJSON, saveJSON } from "./lib/storage";
-import { isDetachedPanelId, openDetachedWindow } from "./lib/detachedWindows";
-import type { DetachedPanelId } from "./lib/detachedWindows";
+import { DETACHED_PANEL_CONTEXT_EVENT, isDetachedPanelId, openDetachedWindow } from "./lib/detachedWindows";
+import type { DetachedPanelContext, DetachedPanelId } from "./lib/detachedWindows";
 import { contractKey } from "./types";
 import type { ContractSpec, WatchlistItem } from "./types";
 
@@ -42,7 +43,7 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function DetachablePanel({ panel, children }: { panel: DetachedPanelId; children: ReactNode }) {
+function DetachablePanel({ panel, context, onError, children }: { panel: DetachedPanelId; context: DetachedPanelContext; onError: (error: unknown) => void; children: ReactNode }) {
   return (
     <section className="detachable-panel" data-panel={panel}>
       <button
@@ -50,7 +51,7 @@ function DetachablePanel({ panel, children }: { panel: DetachedPanelId; children
         type="button"
         title="Open in a new window"
         aria-label="Open panel in a new window"
-        onClick={() => void openDetachedWindow(panel)}
+        onClick={() => void openDetachedWindow(panel, context).catch(onError)}
       >
         ↗
       </button>
@@ -62,6 +63,10 @@ function DetachablePanel({ panel, children }: { panel: DetachedPanelId; children
 export default function App() {
   const detachedPanelParam = new URLSearchParams(window.location.search).get("panel");
   const detachedPanel = isDetachedPanelId(detachedPanelParam) ? detachedPanelParam : null;
+  const [detachedContext, setDetachedContext] = useState<DetachedPanelContext>(() => ({
+    symbolKey: new URLSearchParams(window.location.search).get("symbol"),
+    account: new URLSearchParams(window.location.search).get("account"),
+  }));
   const { theme, toggleTheme } = useTheme();
   const {
     connection,
@@ -107,11 +112,15 @@ export default function App() {
   const { settings, updateSettings } = useSettings();
 
   const [selected, setSelected] = useState<WatchlistItem | null>(null);
+  const [windowError, setWindowError] = useState<string | null>(null);
   const [panelWidths, setPanelWidths] = useState<PanelWidths>(() => loadJSON(PANEL_WIDTHS_KEY, DEFAULT_PANEL_WIDTHS));
   const panelWidthsRef = useRef(panelWidths);
   panelWidthsRef.current = panelWidths;
 
   const visibleWatchlist = watchlist.filter((item) => activeGroup?.keys.includes(item.key));
+  const detachedWindowContext: DetachedPanelContext = { symbolKey: selected?.key, account: selectedAccount };
+  const handleWindowError = (error: unknown) => setWindowError(`Could not open window: ${String(error)}`);
+  const handleOpenPanel = (panel: DetachedPanelId) => void openDetachedWindow(panel, detachedWindowContext).catch(handleWindowError);
 
   const handleLeftResize = (deltaX: number) => {
     setPanelWidths((prev) => ({ ...prev, left: clamp(prev.left + deltaX, MIN_COL_WIDTH, MAX_LEFT_WIDTH) }));
@@ -120,6 +129,26 @@ export default function App() {
     setPanelWidths((prev) => ({ ...prev, right: clamp(prev.right - deltaX, MIN_COL_WIDTH, MAX_RIGHT_WIDTH) }));
   };
   const handleResizeEnd = () => saveJSON(PANEL_WIDTHS_KEY, panelWidthsRef.current);
+
+  useEffect(() => {
+    if (!detachedPanel) return;
+    let unlisten: (() => void) | undefined;
+    void listen<DetachedPanelContext>(DETACHED_PANEL_CONTEXT_EVENT, (event) => setDetachedContext(event.payload)).then((stop) => {
+      unlisten = stop;
+    });
+    return () => unlisten?.();
+  }, [detachedPanel]);
+
+  useEffect(() => {
+    if (!detachedPanel || !detachedContext.symbolKey) return;
+    const matchingItem = watchlist.find((item) => item.key === detachedContext.symbolKey);
+    if (matchingItem && matchingItem.key !== selected?.key) setSelected(matchingItem);
+  }, [detachedContext.symbolKey, detachedPanel, selected?.key, watchlist]);
+
+  useEffect(() => {
+    if (!detachedPanel || !detachedContext.account || detachedContext.account === selectedAccount) return;
+    if (connection.accounts?.includes(detachedContext.account)) void selectAccount(detachedContext.account);
+  }, [connection.accounts, detachedContext.account, detachedPanel, selectAccount, selectedAccount]);
 
   useEffect(() => {
     if (connection.connected) {
@@ -197,14 +226,16 @@ export default function App() {
         onSelectAccount={selectAccount}
         onToggleTheme={toggleTheme}
         onChangeSettings={updateSettings}
+        onOpenPanel={handleOpenPanel}
       />
       {lastError && <div className="error-banner global-error">{lastError}</div>}
+      {windowError && <div className="error-banner global-error window-error">{windowError}<button className="btn-icon" onClick={() => setWindowError(null)} aria-label="Dismiss window error">×</button></div>}
       <main
         className="app-grid"
         style={{ gridTemplateColumns: `${panelWidths.left}px 5px 1fr 5px ${panelWidths.right}px` }}
       >
         <div className="col col-left">
-          <DetachablePanel panel="watchlist"><Watchlist
+          <DetachablePanel panel="watchlist" context={detachedWindowContext} onError={handleWindowError}><Watchlist
             watchlist={watchlist}
             quotes={quotes}
             selectedKey={selected?.key ?? null}
@@ -221,39 +252,39 @@ export default function App() {
             onAdd={handleAddToWatchlist}
             onRemove={handleRemoveFromWatchlist}
           /></DetachablePanel>
-          <DetachablePanel panel="positions"><PositionsPanel
+          <DetachablePanel panel="positions" context={detachedWindowContext} onError={handleWindowError}><PositionsPanel
             positions={positions}
             connected={connection.connected}
             selectedAccount={selectedAccount}
             onRefresh={refreshPositions}
           /></DetachablePanel>
-          <DetachablePanel panel="account"><AccountSummaryPanel
+          <DetachablePanel panel="account" context={detachedWindowContext} onError={handleWindowError}><AccountSummaryPanel
             accountSummary={accountSummary}
             pnl={pnl}
             connected={connection.connected}
             selectedAccount={selectedAccount}
             onRefresh={refreshAccountSummary}
           /></DetachablePanel>
-          <DetachablePanel panel="alerts"><PriceAlertsPanel alerts={alerts} watchlist={visibleWatchlist} onAdd={addAlert} onRemove={removeAlert} /></DetachablePanel>
+          <DetachablePanel panel="alerts" context={detachedWindowContext} onError={handleWindowError}><PriceAlertsPanel alerts={alerts} watchlist={visibleWatchlist} onAdd={addAlert} onRemove={removeAlert} /></DetachablePanel>
         </div>
         <ColumnResizer onResize={handleLeftResize} onResizeEnd={handleResizeEnd} />
         <div className="col col-center">
-          <DetachablePanel panel="chart"><PriceChart
+          <DetachablePanel panel="chart" context={detachedWindowContext} onError={handleWindowError}><PriceChart
             label={selected?.label ?? null}
             spec={selected?.spec ?? null}
             connected={connection.connected}
             theme={theme}
             fetchHistoricalBars={fetchHistoricalBars}
           /></DetachablePanel>
-          <DetachablePanel panel="orders"><OpenOrdersPanel
+          <DetachablePanel panel="orders" context={detachedWindowContext} onError={handleWindowError}><OpenOrdersPanel
             openOrders={openOrders}
             connected={connection.connected}
             onRefresh={refreshOpenOrders}
             onCancel={cancelOrder}
             onModify={modifyOrder}
           /></DetachablePanel>
-          <DetachablePanel panel="blotter"><TradeBlotterPanel connected={connection.connected} fetchExecutions={fetchExecutions} /></DetachablePanel>
-          <DetachablePanel panel="news"><NewsPanel
+          <DetachablePanel panel="blotter" context={detachedWindowContext} onError={handleWindowError}><TradeBlotterPanel connected={connection.connected} fetchExecutions={fetchExecutions} /></DetachablePanel>
+          <DetachablePanel panel="news" context={detachedWindowContext} onError={handleWindowError}><NewsPanel
             label={selected?.label ?? null}
             spec={selected?.spec ?? null}
             connected={connection.connected}
@@ -263,7 +294,7 @@ export default function App() {
         </div>
         <ColumnResizer onResize={handleRightResize} onResizeEnd={handleResizeEnd} />
         <div className="col col-right">
-          <DetachablePanel panel="ticket"><OrderTicket
+          <DetachablePanel panel="ticket" context={detachedWindowContext} onError={handleWindowError}><OrderTicket
             label={selected?.label ?? null}
             spec={selected?.spec ?? null}
             quote={selected ? quotes[selected.key] : undefined}
@@ -272,9 +303,9 @@ export default function App() {
             onSubmit={placeOrder}
             orderLog={orderLog}
           /></DetachablePanel>
-          <DetachablePanel panel="depth"><MarketDepthPanel connected={connection.connected} symbolLabel={selected?.label ?? null} depthBook={depthBook} /></DetachablePanel>
-          <DetachablePanel panel="scanner"><ScannerPanel connected={connection.connected} onRun={runScanner} onAddToWatchlist={handleAddToWatchlist} /></DetachablePanel>
-          <DetachablePanel panel="activity"><ActivityLogPanel activityLog={activityLog} onClear={clearActivityLog} /></DetachablePanel>
+          <DetachablePanel panel="depth" context={detachedWindowContext} onError={handleWindowError}><MarketDepthPanel connected={connection.connected} symbolLabel={selected?.label ?? null} depthBook={depthBook} /></DetachablePanel>
+          <DetachablePanel panel="scanner" context={detachedWindowContext} onError={handleWindowError}><ScannerPanel connected={connection.connected} onRun={runScanner} onAddToWatchlist={handleAddToWatchlist} /></DetachablePanel>
+          <DetachablePanel panel="activity" context={detachedWindowContext} onError={handleWindowError}><ActivityLogPanel activityLog={activityLog} onClear={clearActivityLog} /></DetachablePanel>
         </div>
       </main>
     </div>

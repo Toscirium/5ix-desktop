@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import type { Theme } from "../hooks/useTheme";
 import { loadJSON, saveJSON } from "../lib/storage";
+import { DETACHABLE_PANELS, PANEL_TITLES } from "../lib/detachedWindows";
+import type { DetachedPanelId } from "../lib/detachedWindows";
 import { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
 import { SettingsDialog } from "./SettingsDialog";
 import { UpdateButton } from "./UpdateButton";
@@ -27,6 +29,7 @@ interface ConnectionBarProps {
   onSelectAccount: (account: string) => void;
   onToggleTheme: () => void;
   onChangeSettings: (patch: Partial<Settings>) => void;
+  onOpenPanel: (panel: DetachedPanelId) => void;
 }
 
 export function ConnectionBar({
@@ -40,6 +43,7 @@ export function ConnectionBar({
   onSelectAccount,
   onToggleTheme,
   onChangeSettings,
+  onOpenPanel,
 }: ConnectionBarProps) {
   const [host, setHost] = useState(() => loadJSON(STORAGE_KEY, DEFAULT_SETTINGS).host);
   const [port, setPort] = useState(() => loadJSON(STORAGE_KEY, DEFAULT_SETTINGS).port);
@@ -110,6 +114,16 @@ export function ConnectionBar({
         <span className={connection.connected ? "status-dot status-dot-live" : "status-dot"} />
         {connection.connected ? `Connected (server v${connection.serverVersion ?? "?"})` : "Disconnected"}
       </div>
+      <details className="window-menu">
+        <summary title="Open or focus a panel window">Windows</summary>
+        <div className="window-menu-list">
+          {DETACHABLE_PANELS.map((panel) => (
+            <button key={panel} type="button" onClick={() => onOpenPanel(panel)}>
+              {PANEL_TITLES[panel]}
+            </button>
+          ))}
+        </div>
+      </details>
       <UpdateButton />
       <button
         className="theme-toggle"
