@@ -87,6 +87,12 @@ export interface Settings {
   notificationsEnabled: boolean;
 }
 
+export interface BracketOrderIds {
+  parentId: number;
+  takeProfitId: number;
+  stopLossId: number;
+}
+
 export interface DepthLevel {
   price: number;
   size: number;

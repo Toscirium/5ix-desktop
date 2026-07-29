@@ -13,8 +13,8 @@ use tauri::{AppHandle, Emitter, State};
 
 use super::contracts::{build_contract, ContractSpec};
 use super::dto::{
-    AccountValueDto, BarDto, ConnectionStatusDto, DepthBookDto, DepthLevelDto, ExecutionDto, NewsArticleDto, OpenOrderDto,
-    OptionChainDto, OptionSnapshotDto, OrderUpdateDto, PnlDto, PositionDto, QuoteDto, ScannerRowDto, SymbolMatchDto,
+    AccountValueDto, BarDto, BracketOrderIdsDto, ConnectionStatusDto, DepthBookDto, DepthLevelDto, ExecutionDto, NewsArticleDto,
+    OpenOrderDto, OptionChainDto, OptionSnapshotDto, OrderUpdateDto, PnlDto, PositionDto, QuoteDto, ScannerRowDto, SymbolMatchDto,
 };
 use super::state::AppState;
 
@@ -396,6 +396,50 @@ pub async fn place_order(
     };
 
     Ok(i32::from(order_id))
+}
+
+#[tauri::command]
+pub async fn place_bracket_order(
+    spec: ContractSpec,
+    side: String,
+    quantity: f64,
+    entry_price: Option<f64>,
+    take_profit: f64,
+    stop_loss: f64,
+    state: State<'_, AppState>,
+) -> Result<BracketOrderIdsDto, String> {
+    let client = state.client.lock().await.clone().ok_or_else(|| "Not connected".to_string())?;
+    let contract = build_contract(&spec)?;
+    let account = state.selected_account.lock().await.clone();
+    let builder = client.order(&contract);
+    let builder = match side.to_uppercase().as_str() {
+        "BUY" => builder.buy(quantity),
+        "SELL" => builder.sell(quantity),
+        other => return Err(format!("Invalid order side: {other}")),
+    };
+    let builder = match account {
+        Some(account) => builder.account(account),
+        None => builder,
+    };
+
+    let bracket = builder.bracket();
+    let bracket = match entry_price {
+        Some(price) => bracket.entry_limit(price),
+        None => bracket.entry_market(),
+    };
+
+    let ids = bracket
+        .take_profit(take_profit)
+        .stop_loss(stop_loss)
+        .submit_all()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(BracketOrderIdsDto {
+        parent_id: i32::from(ids.parent),
+        take_profit_id: i32::from(ids.take_profit),
+        stop_loss_id: i32::from(ids.stop_loss),
+    })
 }
 
 #[tauri::command]

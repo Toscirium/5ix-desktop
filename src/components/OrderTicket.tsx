@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { OrderConfirmDialog } from "./OrderConfirmDialog";
-import type { AlgoOptions, AlgoStrategy, ContractSpec, OrderSide, OrderType, OrderUpdate, Quote, Settings } from "../types";
+import type { AlgoOptions, AlgoStrategy, BracketOrderIds, ContractSpec, OrderSide, OrderType, OrderUpdate, Quote, Settings } from "../types";
 
 interface OrderTicketProps {
   label: string | null;
@@ -18,6 +18,14 @@ interface OrderTicketProps {
     trailingPercent?: number,
     algo?: AlgoOptions,
   ) => Promise<number>;
+  onSubmitBracket: (
+    spec: ContractSpec,
+    side: OrderSide,
+    quantity: number,
+    entryPrice: number | undefined,
+    takeProfit: number,
+    stopLoss: number,
+  ) => Promise<BracketOrderIds>;
   orderLog: OrderUpdate[];
 }
 
@@ -57,11 +65,12 @@ interface PendingOrder {
   auxPrice?: number;
   trailingPercent?: number;
   algo?: AlgoOptions;
+  bracket?: { takeProfit: number; stopLoss: number };
   estimatedNotional: number | null;
   warning: string | null;
 }
 
-export function OrderTicket({ label, spec, quote, connected, settings, onSubmit, orderLog }: OrderTicketProps) {
+export function OrderTicket({ label, spec, quote, connected, settings, onSubmit, onSubmitBracket, orderLog }: OrderTicketProps) {
   const [side, setSide] = useState<OrderSide>("BUY");
   const [quantity, setQuantity] = useState(settings.defaultQuantity);
   const [orderType, setOrderType] = useState<OrderType>("MARKET");
@@ -72,6 +81,9 @@ export function OrderTicket({ label, spec, quote, connected, settings, onSubmit,
   const [algoStartTime, setAlgoStartTime] = useState("");
   const [algoEndTime, setAlgoEndTime] = useState("");
   const [algoMaxPctVol, setAlgoMaxPctVol] = useState<number | "">("");
+  const [bracketEnabled, setBracketEnabled] = useState(false);
+  const [takeProfitPrice, setTakeProfitPrice] = useState<number | "">("");
+  const [stopLossPrice, setStopLossPrice] = useState<number | "">("");
   const [submitting, setSubmitting] = useState(false);
   const [lastResult, setLastResult] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingOrder | null>(null);
@@ -84,27 +96,44 @@ export function OrderTicket({ label, spec, quote, connected, settings, onSubmit,
   const needsStop = orderType === "STOP" || orderType === "STOP_LIMIT" || orderType === "TRAILING_STOP";
   const needsTrailingPercent = orderType === "TRAILING_STOP";
   const supportsAlgo = orderType === "MARKET" || orderType === "LIMIT";
+  const supportsBracket = orderType === "MARKET" || orderType === "LIMIT";
 
   useEffect(() => {
     if (!supportsAlgo) setAlgoStrategy("NONE");
   }, [supportsAlgo]);
+
+  useEffect(() => {
+    if (!supportsBracket) setBracketEnabled(false);
+  }, [supportsBracket]);
 
   const doSubmit = async () => {
     if (!spec || !pending) return;
     setSubmitting(true);
     setLastResult(null);
     try {
-      const orderId = await onSubmit(
-        spec,
-        pending.side,
-        pending.quantity,
-        pending.orderType,
-        pending.limitPrice,
-        pending.auxPrice,
-        pending.trailingPercent,
-        pending.algo,
-      );
-      setLastResult(`Submitted order #${orderId}`);
+      if (pending.bracket) {
+        const ids = await onSubmitBracket(
+          spec,
+          pending.side,
+          pending.quantity,
+          pending.limitPrice,
+          pending.bracket.takeProfit,
+          pending.bracket.stopLoss,
+        );
+        setLastResult(`Submitted bracket #${ids.parentId} (TP #${ids.takeProfitId}, SL #${ids.stopLossId})`);
+      } else {
+        const orderId = await onSubmit(
+          spec,
+          pending.side,
+          pending.quantity,
+          pending.orderType,
+          pending.limitPrice,
+          pending.auxPrice,
+          pending.trailingPercent,
+          pending.algo,
+        );
+        setLastResult(`Submitted order #${orderId}`);
+      }
       setPending(null);
     } catch (e) {
       setLastResult(`Failed: ${String(e)}`);
@@ -127,6 +156,7 @@ export function OrderTicket({ label, spec, quote, connected, settings, onSubmit,
             endTime: algoEndTime.trim() || undefined,
             maxPctVol: algoStrategy === "VWAP" && algoMaxPctVol !== "" ? Number(algoMaxPctVol) : undefined,
           };
+    const bracket = bracketEnabled ? { takeProfit: Number(takeProfitPrice), stopLoss: Number(stopLossPrice) } : undefined;
     const referencePrice = limit ?? quote?.last ?? quote?.ask ?? quote?.bid ?? null;
     const estimatedNotional = referencePrice != null ? referencePrice * quantity : null;
     setPending({
@@ -138,6 +168,7 @@ export function OrderTicket({ label, spec, quote, connected, settings, onSubmit,
       auxPrice: aux,
       trailingPercent: trailing,
       algo,
+      bracket,
       estimatedNotional,
       warning: buildWarning(quantity, estimatedNotional, settings),
     });
@@ -147,7 +178,8 @@ export function OrderTicket({ label, spec, quote, connected, settings, onSubmit,
     quantity > 0 &&
     (!needsLimit || Number(limitPrice) > 0) &&
     (!needsStop || Number(stopPrice) > 0) &&
-    (!needsTrailingPercent || Number(trailingPercent) > 0);
+    (!needsTrailingPercent || Number(trailingPercent) > 0) &&
+    (!bracketEnabled || (Number(takeProfitPrice) > 0 && Number(stopLossPrice) > 0));
 
   const canSubmit = connected && !!spec && fieldsValid && !submitting;
 
@@ -214,10 +246,47 @@ export function OrderTicket({ label, spec, quote, connected, settings, onSubmit,
               />
             </label>
           )}
+          {supportsBracket && (
+            <label className="field settings-checkbox-row">
+              <span>Attach bracket (take-profit / stop-loss)</span>
+              <input
+                type="checkbox"
+                checked={bracketEnabled}
+                disabled={algoStrategy !== "NONE"}
+                onChange={(e) => setBracketEnabled(e.target.checked)}
+              />
+            </label>
+          )}
+          {bracketEnabled && (
+            <>
+              <label className="field">
+                <span>Take Profit Price</span>
+                <input
+                  type="number"
+                  value={takeProfitPrice}
+                  step="0.01"
+                  onChange={(e) => setTakeProfitPrice(e.target.value === "" ? "" : Number(e.target.value))}
+                />
+              </label>
+              <label className="field">
+                <span>Stop Loss Price</span>
+                <input
+                  type="number"
+                  value={stopLossPrice}
+                  step="0.01"
+                  onChange={(e) => setStopLossPrice(e.target.value === "" ? "" : Number(e.target.value))}
+                />
+              </label>
+            </>
+          )}
           {supportsAlgo && (
             <label className="field">
               <span>Algo Strategy</span>
-              <select value={algoStrategy} onChange={(e) => setAlgoStrategy(e.target.value as "NONE" | AlgoStrategy)}>
+              <select
+                value={algoStrategy}
+                disabled={bracketEnabled}
+                onChange={(e) => setAlgoStrategy(e.target.value as "NONE" | AlgoStrategy)}
+              >
                 {ALGO_STRATEGIES.map((a) => (
                   <option key={a.value} value={a.value}>
                     {a.label}

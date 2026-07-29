@@ -138,6 +138,14 @@ pub struct DepthBookDto {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct BracketOrderIdsDto {
+    pub parent_id: i32,
+    pub take_profit_id: i32,
+    pub stop_loss_id: i32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ExecutionDto {
     pub order_id: i32,
     pub symbol: String,

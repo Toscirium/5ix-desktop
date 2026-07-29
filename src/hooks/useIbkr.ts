@@ -11,6 +11,7 @@ import type {
   AlgoOptions,
   Bar,
   BarSizeOption,
+  BracketOrderIds,
   ConnectionStatus,
   ContractSpec,
   DepthBook,
@@ -304,6 +305,30 @@ export function useIbkr() {
     [logActivity, reportError],
   );
 
+  const placeBracketOrder = useCallback(
+    async (spec: ContractSpec, side: OrderSide, quantity: number, entryPrice: number | undefined, takeProfit: number, stopLoss: number) => {
+      try {
+        const ids = await invoke<BracketOrderIds>("place_bracket_order", {
+          spec,
+          side,
+          quantity,
+          entryPrice: entryPrice ?? null,
+          takeProfit,
+          stopLoss,
+        });
+        logActivity(
+          "success",
+          `Bracket order #${ids.parentId} submitted: ${side} ${quantity} ${spec.symbol} (TP #${ids.takeProfitId} @ ${takeProfit}, SL #${ids.stopLossId} @ ${stopLoss})`,
+        );
+        return ids;
+      } catch (e) {
+        reportError(String(e));
+        throw e;
+      }
+    },
+    [logActivity, reportError],
+  );
+
   const refreshPositions = useCallback(async () => {
     try {
       const result = await invoke<Position[]>("get_positions");
@@ -477,6 +502,7 @@ export function useIbkr() {
     addInstrument,
     removeInstrument,
     placeOrder,
+    placeBracketOrder,
     refreshPositions,
     refreshAccountSummary,
     fetchHistoricalBars,

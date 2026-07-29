@@ -11,6 +11,7 @@ interface PendingOrder {
   auxPrice?: number;
   trailingPercent?: number;
   algo?: AlgoOptions;
+  bracket?: { takeProfit: number; stopLoss: number };
   estimatedNotional: number | null;
   warning: string | null;
 }
@@ -36,13 +37,13 @@ function formatMoney(n: number) {
 
 export function OrderConfirmDialog({ order, submitting, onConfirm, onCancel }: OrderConfirmDialogProps) {
   useEscapeToClose(onCancel);
-  const { label, side, quantity, orderType, limitPrice, auxPrice, trailingPercent, algo, estimatedNotional, warning } = order;
+  const { label, side, quantity, orderType, limitPrice, auxPrice, trailingPercent, algo, bracket, estimatedNotional, warning } = order;
 
   return createPortal(
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          Confirm {side === "BUY" ? "Buy" : "Sell"} Order
+          Confirm {side === "BUY" ? "Buy" : "Sell"} {bracket ? "Bracket " : ""}Order
         </div>
         <div className="modal-body">
           <div className="modal-row">
@@ -87,6 +88,18 @@ export function OrderConfirmDialog({ order, submitting, onConfirm, onCancel }: O
                 {algo.maxPctVol != null ? ` (max ${Math.round(algo.maxPctVol * 100)}%)` : ""}
               </span>
             </div>
+          )}
+          {bracket && (
+            <>
+              <div className="modal-row">
+                <span>Take Profit</span>
+                <span className="text-up">{bracket.takeProfit}</span>
+              </div>
+              <div className="modal-row">
+                <span>Stop Loss</span>
+                <span className="text-down">{bracket.stopLoss}</span>
+              </div>
+            </>
           )}
           {estimatedNotional != null && (
             <div className="modal-row">

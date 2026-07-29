@@ -88,6 +88,7 @@ export default function App() {
     addInstrument,
     removeInstrument,
     placeOrder,
+    placeBracketOrder,
     refreshPositions,
     refreshAccountSummary,
     fetchHistoricalBars,
@@ -301,6 +302,7 @@ export default function App() {
             connected={connection.connected}
             settings={settings}
             onSubmit={placeOrder}
+            onSubmitBracket={placeBracketOrder}
             orderLog={orderLog}
           /></DetachablePanel>
           <DetachablePanel panel="depth" context={detachedWindowContext} onError={handleWindowError}><MarketDepthPanel connected={connection.connected} symbolLabel={selected?.label ?? null} depthBook={depthBook} /></DetachablePanel>
