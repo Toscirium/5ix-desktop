@@ -1,0 +1,56 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "5ix",
+  "version": "0.1.0",
+  "identifier": "io.fiveix.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "5ix",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 640
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "publisher": "5ix",
+    "copyright": "Copyright 5ix contributors",
+    "category": "Finance",
+    "shortDescription": "Fast, native desktop trading terminal for Interactive Brokers",
+    "longDescription": "5ix is a Rust/React trading terminal that connects to Interactive Brokers via IB Gateway or TWS: live multi-asset quotes, charting, order entry, positions, account summary, a market scanner, and news.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "linux": {
+      "deb": {
+        "depends": []
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ5MURDMzY2OTczNjJDMTIKUldRU0xEYVhac01kMlJkZUpRTlZLNnhuWWhPeHE3Z0Vwa1lBVTMzMU9tRElKK3YwdEZ1VlF0ejMK",
+      "endpoints": [
+        "https://github.com/REPLACE-WITH-OWNER/REPLACE-WITH-REPO/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}
