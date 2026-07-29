@@ -4,15 +4,20 @@ import { AccountSummaryPanel } from "./components/AccountSummaryPanel";
 import { ActivityLogPanel } from "./components/ActivityLogPanel";
 import { ColumnResizer } from "./components/ColumnResizer";
 import { ConnectionBar } from "./components/ConnectionBar";
+import { MarketDepthPanel } from "./components/MarketDepthPanel";
 import { NewsPanel } from "./components/NewsPanel";
 import { OpenOrdersPanel } from "./components/OpenOrdersPanel";
 import { OrderTicket } from "./components/OrderTicket";
 import { PositionsPanel } from "./components/PositionsPanel";
+import { PriceAlertsPanel } from "./components/PriceAlertsPanel";
 import { PriceChart } from "./components/PriceChart";
 import { ScannerPanel } from "./components/ScannerPanel";
+import { TradeBlotterPanel } from "./components/TradeBlotterPanel";
 import { Watchlist } from "./components/Watchlist";
 import { useIbkr } from "./hooks/useIbkr";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { usePriceAlerts } from "./hooks/usePriceAlerts";
+import { useSettings } from "./hooks/useSettings";
 import { useTheme } from "./hooks/useTheme";
 import { useWatchlistGroups } from "./hooks/useWatchlistGroups";
 import { loadJSON, saveJSON } from "./lib/storage";
@@ -48,6 +53,7 @@ export default function App() {
     openOrders,
     selectedAccount,
     pnl,
+    depthBook,
     lastError,
     activityLog,
     connect,
@@ -68,11 +74,16 @@ export default function App() {
     getOptionSnapshot,
     fetchNews,
     fetchNewsArticle,
+    fetchExecutions,
     clearActivityLog,
+    subscribeMarketDepth,
+    unsubscribeMarketDepth,
   } = useIbkr();
 
   const { groups, activeGroup, selectGroup, addGroup, removeGroup, addKeyToActiveGroup, removeKeyFromActiveGroup } =
     useWatchlistGroups();
+  const { alerts, addAlert, removeAlert } = usePriceAlerts(quotes);
+  const { settings, updateSettings } = useSettings();
 
   const [selected, setSelected] = useState<WatchlistItem | null>(null);
   const [panelWidths, setPanelWidths] = useState<PanelWidths>(() => loadJSON(PANEL_WIDTHS_KEY, DEFAULT_PANEL_WIDTHS));
@@ -102,6 +113,15 @@ export default function App() {
     if (selected && !visibleWatchlist.some((w) => w.key === selected.key)) setSelected(visibleWatchlist[0] ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleWatchlist, selected]);
+
+  useEffect(() => {
+    if (!connection.connected || !selected) return;
+    subscribeMarketDepth(selected.spec, 10);
+    return () => {
+      unsubscribeMarketDepth();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connection.connected, selected?.key]);
 
   const handleAddToWatchlist = async (spec: ContractSpec) => {
     await addInstrument(spec);
@@ -150,10 +170,12 @@ export default function App() {
         connecting={connecting}
         selectedAccount={selectedAccount}
         theme={theme}
+        settings={settings}
         onConnect={connect}
         onDisconnect={disconnect}
         onSelectAccount={selectAccount}
         onToggleTheme={toggleTheme}
+        onChangeSettings={updateSettings}
       />
       {lastError && <div className="error-banner global-error">{lastError}</div>}
       <main
@@ -191,6 +213,7 @@ export default function App() {
             selectedAccount={selectedAccount}
             onRefresh={refreshAccountSummary}
           />
+          <PriceAlertsPanel alerts={alerts} watchlist={visibleWatchlist} onAdd={addAlert} onRemove={removeAlert} />
         </div>
         <ColumnResizer onResize={handleLeftResize} onResizeEnd={handleResizeEnd} />
         <div className="col col-center">
@@ -208,6 +231,7 @@ export default function App() {
             onCancel={cancelOrder}
             onModify={modifyOrder}
           />
+          <TradeBlotterPanel connected={connection.connected} fetchExecutions={fetchExecutions} />
           <NewsPanel
             label={selected?.label ?? null}
             spec={selected?.spec ?? null}
@@ -223,9 +247,11 @@ export default function App() {
             spec={selected?.spec ?? null}
             quote={selected ? quotes[selected.key] : undefined}
             connected={connection.connected}
+            settings={settings}
             onSubmit={placeOrder}
             orderLog={orderLog}
           />
+          <MarketDepthPanel connected={connection.connected} symbolLabel={selected?.label ?? null} depthBook={depthBook} />
           <ScannerPanel connected={connection.connected} onRun={runScanner} onAddToWatchlist={handleAddToWatchlist} />
           <ActivityLogPanel activityLog={activityLog} onClear={clearActivityLog} />
         </div>

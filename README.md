@@ -27,6 +27,13 @@ npm install
 npm run tauri dev
 ```
 
+## Testing
+
+```bash
+npm run test               # frontend unit tests (vitest)
+cargo test --manifest-path src-tauri/Cargo.toml   # Rust unit tests
+```
+
 ## Building installers
 
 ```bash

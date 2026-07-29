@@ -429,18 +429,24 @@ body.resizing-columns {
 }
 
 .col-center .chart-panel {
-  flex: 2 1 260px;
-  min-height: 200px;
+  flex: 3 1 220px;
+  min-height: 180px;
 }
 
 .col-center .open-orders-panel {
-  flex: 1 1 140px;
+  flex: 1 1 120px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+}
+
+.col-center .trade-blotter-panel {
+  flex: 1 1 120px;
   overflow-y: auto;
   border-top: 1px solid var(--border);
 }
 
 .col-center .news-panel {
-  flex: 1 1 140px;
+  flex: 1 1 120px;
   overflow-y: auto;
   border-top: 1px solid var(--border);
 }
@@ -543,6 +549,45 @@ body.resizing-columns {
 .text-down {
   color: var(--down);
   font-weight: 600;
+}
+
+/* Market depth */
+.depth-table th,
+.depth-table td {
+  text-align: right;
+}
+
+.depth-price-cell {
+  font-weight: 600;
+}
+
+.depth-size-cell {
+  position: relative;
+  text-align: right;
+}
+
+.depth-size-cell span {
+  position: relative;
+  z-index: 1;
+}
+
+.depth-size-cell-ask {
+  text-align: right;
+}
+
+.depth-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 0;
+  background: color-mix(in srgb, var(--up) 18%, transparent);
+}
+
+.depth-bar-ask {
+  right: auto;
+  left: 0;
+  background: color-mix(in srgb, var(--down) 18%, transparent);
 }
 
 /* Watchlist */
@@ -981,6 +1026,14 @@ body.resizing-columns {
   font-weight: 500;
 }
 
+.alert-triggered {
+  opacity: 0.5;
+}
+
+.alert-triggered .symbol-cell {
+  text-decoration: line-through;
+}
+
 .account-value {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -1061,6 +1114,25 @@ body.resizing-columns {
 }
 
 /* Options chain dialog */
+.settings-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-checkbox-row {
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-checkbox-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
 .options-chain-card {
   width: 720px;
 }

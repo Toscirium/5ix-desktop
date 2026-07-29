@@ -69,6 +69,34 @@ export interface AccountValue {
   currency: string;
 }
 
+export type AlertCondition = "ABOVE" | "BELOW";
+
+export interface PriceAlert {
+  id: string;
+  key: string;
+  label: string;
+  condition: AlertCondition;
+  price: number;
+  triggered: boolean;
+}
+
+export interface Settings {
+  defaultQuantity: number;
+  largeNotionalThreshold: number;
+  largeQuantityThreshold: number;
+  notificationsEnabled: boolean;
+}
+
+export interface DepthLevel {
+  price: number;
+  size: number;
+}
+
+export interface DepthBook {
+  bids: (DepthLevel | null)[];
+  asks: (DepthLevel | null)[];
+}
+
 export interface Pnl {
   dailyPnl: number;
   unrealizedPnl?: number | null;
@@ -123,6 +151,18 @@ export interface OpenOrder {
   limitPrice?: number | null;
   auxPrice?: number | null;
   status: string;
+}
+
+export interface Execution {
+  orderId: number;
+  symbol: string;
+  securityType: string;
+  side: string;
+  shares: number;
+  price: number;
+  time: string;
+  exchange: string;
+  commission?: number | null;
 }
 
 export interface NewsArticleHeadline {

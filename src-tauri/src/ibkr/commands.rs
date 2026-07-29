@@ -3,16 +3,18 @@ use std::sync::Arc;
 use ibapi::accounts::types::{AccountGroup, AccountId};
 use ibapi::contracts::tick_types::TickType;
 use ibapi::market_data::historical::{Bar, BarTimestamp};
+use ibapi::market_data::realtime::MarketDepths;
 use ibapi::news::ArticleType;
 use ibapi::orders::builder::{twap, vwap};
+use ibapi::orders::Executions;
 use ibapi::prelude::*;
 use ibapi::scanner::ScannerSubscription;
 use tauri::{AppHandle, Emitter, State};
 
 use super::contracts::{build_contract, ContractSpec};
 use super::dto::{
-    AccountValueDto, BarDto, ConnectionStatusDto, NewsArticleDto, OpenOrderDto, OptionChainDto, OptionSnapshotDto, OrderUpdateDto, PnlDto,
-    PositionDto, QuoteDto, ScannerRowDto, SymbolMatchDto,
+    AccountValueDto, BarDto, ConnectionStatusDto, DepthBookDto, DepthLevelDto, ExecutionDto, NewsArticleDto, OpenOrderDto,
+    OptionChainDto, OptionSnapshotDto, OrderUpdateDto, PnlDto, PositionDto, QuoteDto, ScannerRowDto, SymbolMatchDto,
 };
 use super::state::AppState;
 
@@ -95,6 +97,72 @@ pub async fn subscribe_pnl(account: String, state: State<'_, AppState>, app: App
 }
 
 #[tauri::command]
+pub async fn subscribe_market_depth(
+    spec: ContractSpec,
+    rows: i32,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let client = state.client.lock().await.clone().ok_or_else(|| "Not connected".to_string())?;
+    let contract = build_contract(&spec)?;
+
+    if let Some(handle) = state.depth_task.lock().await.take() {
+        handle.abort();
+    }
+
+    let row_count = rows.max(1) as usize;
+    let app_handle = app.clone();
+    let handle = tokio::spawn(async move {
+        let subscription = match client.market_depth(&contract, rows).smart_depth(SmartDepth::No).subscribe().await {
+            Ok(s) => s,
+            Err(e) => {
+                let _ = app_handle.emit("depth-error", e.to_string());
+                return;
+            }
+        };
+
+        let mut bids: Vec<Option<DepthLevelDto>> = vec![None; row_count];
+        let mut asks: Vec<Option<DepthLevelDto>> = vec![None; row_count];
+
+        let mut subscription = subscription.filter_data();
+        while let Some(item) = subscription.next().await {
+            let (position, operation, side, price, size) = match item {
+                Ok(MarketDepths::MarketDepth(d)) => (d.position, d.operation, d.side, d.price, d.size),
+                Ok(MarketDepths::MarketDepthL2(d)) => (d.position, d.operation, d.side, d.price, d.size),
+                Err(_) => break,
+            };
+
+            let book = if side == 1 { &mut bids } else { &mut asks };
+            let idx = position as usize;
+            if idx < book.len() {
+                match operation {
+                    0 | 1 => book[idx] = Some(DepthLevelDto { price, size }),
+                    2 => book[idx] = None,
+                    _ => {}
+                }
+            }
+
+            let dto = DepthBookDto {
+                bids: bids.clone(),
+                asks: asks.clone(),
+            };
+            let _ = app_handle.emit("depth-update", &dto);
+        }
+    });
+
+    *state.depth_task.lock().await = Some(handle);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn unsubscribe_market_depth(state: State<'_, AppState>) -> Result<(), String> {
+    if let Some(handle) = state.depth_task.lock().await.take() {
+        handle.abort();
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn ibkr_disconnect(state: State<'_, AppState>, app: AppHandle) -> Result<(), String> {
     let mut tasks = state.watchlist_tasks.lock().await;
     for (_, handle) in tasks.drain() {
@@ -106,6 +174,9 @@ pub async fn ibkr_disconnect(state: State<'_, AppState>, app: AppHandle) -> Resu
         handle.abort();
     }
     if let Some(handle) = state.pnl_task.lock().await.take() {
+        handle.abort();
+    }
+    if let Some(handle) = state.depth_task.lock().await.take() {
         handle.abort();
     }
 
@@ -325,6 +396,51 @@ pub async fn place_order(
     };
 
     Ok(i32::from(order_id))
+}
+
+#[tauri::command]
+pub async fn get_executions(days: i32, state: State<'_, AppState>) -> Result<Vec<ExecutionDto>, String> {
+    let client = state.client.lock().await.clone().ok_or_else(|| "Not connected".to_string())?;
+    let filter = ExecutionFilter {
+        last_n_days: days,
+        ..Default::default()
+    };
+    let subscription = client.executions(filter).await.map_err(|e| e.to_string())?;
+    let mut subscription = subscription.filter_data();
+
+    let mut executions: Vec<ExecutionDto> = Vec::new();
+    let mut execution_ids: Vec<String> = Vec::new();
+    let mut commissions: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+
+    while let Some(result) = subscription.next().await {
+        match result.map_err(|e| e.to_string())? {
+            Executions::ExecutionData(data) => {
+                execution_ids.push(data.execution.execution_id.clone());
+                executions.push(ExecutionDto {
+                    order_id: data.execution.order_id,
+                    symbol: data.contract.symbol.to_string(),
+                    security_type: data.contract.security_type.to_string(),
+                    side: data.execution.side.to_string(),
+                    shares: data.execution.shares,
+                    price: data.execution.price,
+                    time: data.execution.time.clone(),
+                    exchange: data.execution.exchange.clone(),
+                    commission: None,
+                });
+            }
+            Executions::CommissionReport(report) => {
+                commissions.insert(report.execution_id.clone(), report.commission);
+            }
+        }
+    }
+
+    for (i, exec_id) in execution_ids.iter().enumerate() {
+        if let Some(commission) = commissions.get(exec_id) {
+            executions[i].commission = Some(*commission);
+        }
+    }
+
+    Ok(executions)
 }
 
 #[tauri::command]

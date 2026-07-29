@@ -122,6 +122,34 @@ pub struct OptionSnapshotDto {
     pub implied_vol: Option<f64>,
 }
 
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct DepthLevelDto {
+    pub price: f64,
+    pub size: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct DepthBookDto {
+    pub bids: Vec<Option<DepthLevelDto>>,
+    pub asks: Vec<Option<DepthLevelDto>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionDto {
+    pub order_id: i32,
+    pub symbol: String,
+    pub security_type: String,
+    pub side: String,
+    pub shares: f64,
+    pub price: f64,
+    pub time: String,
+    pub exchange: String,
+    pub commission: Option<f64>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SymbolMatchDto {

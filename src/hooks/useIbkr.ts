@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { loadJSON, saveJSON } from "../lib/storage";
+import { notify } from "../lib/notify";
 import { contractKey, contractLabel } from "../types";
 import type {
   AccountValue,
@@ -12,6 +13,8 @@ import type {
   BarSizeOption,
   ConnectionStatus,
   ContractSpec,
+  DepthBook,
+  Execution,
   NewsArticleHeadline,
   OpenOrder,
   OptionChainInfo,
@@ -43,6 +46,7 @@ export function useIbkr() {
   const [openOrders, setOpenOrders] = useState<OpenOrder[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [pnl, setPnl] = useState<Pnl | null>(null);
+  const [depthBook, setDepthBook] = useState<DepthBook | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const [activityLog, setActivityLog] = useState<ActivityEntry[]>([]);
 
@@ -91,11 +95,17 @@ export function useIbkr() {
       }),
       listen<OrderUpdate>("order-update", (event) => {
         setOrderLog((prev) => [event.payload, ...prev].slice(0, 200));
+        const u = event.payload;
+        if (u.kind === "execution") {
+          notify(`Order filled: ${u.symbol ?? ""}`, `${u.side} ${u.shares} @ ${u.price}`);
+        }
       }),
       listen<string>("watchlist-error", (event) => reportError(event.payload)),
       listen<string>("order-update-error", (event) => reportError(event.payload)),
       listen<Pnl>("pnl-update", (event) => setPnl(event.payload)),
       listen<string>("pnl-error", (event) => reportError(event.payload)),
+      listen<DepthBook>("depth-update", (event) => setDepthBook(event.payload)),
+      listen<string>("depth-error", (event) => reportError(event.payload)),
     ];
 
     return () => {
@@ -122,6 +132,7 @@ export function useIbkr() {
         manualDisconnectRef.current = false;
         reconnectAttemptRef.current = 0;
         logActivity("success", `Connected to IB Gateway (server v${status.serverVersion ?? "?"})`);
+        if (opts?.silent) notify("Reconnected to IB Gateway");
         await resubscribeWatchlist();
         return true;
       } catch (e) {
@@ -145,6 +156,7 @@ export function useIbkr() {
     reconnectAttemptRef.current = attempt;
     const delaySec = Math.min(RECONNECT_BASE_DELAY_S * 2 ** (attempt - 1), RECONNECT_MAX_DELAY_S);
     logActivity("error", `Connection lost — retrying in ${delaySec}s (attempt ${attempt})`);
+    if (attempt === 1) notify("Connection to IB Gateway lost", "Attempting to reconnect…");
     setConnection({ connected: false });
 
     reconnectTimerRef.current = window.setTimeout(async () => {
@@ -203,6 +215,7 @@ export function useIbkr() {
       setOpenOrders([]);
       setSelectedAccount(null);
       setPnl(null);
+      setDepthBook(null);
     }
   }, [logActivity, reportError]);
 
@@ -367,6 +380,18 @@ export function useIbkr() {
     }
   }, [reportError]);
 
+  const fetchExecutions = useCallback(
+    async (days: number) => {
+      try {
+        return await invoke<Execution[]>("get_executions", { days });
+      } catch (e) {
+        reportError(String(e));
+        throw e;
+      }
+    },
+    [reportError],
+  );
+
   const cancelOrder = useCallback(
     async (orderId: number) => {
       try {
@@ -411,6 +436,27 @@ export function useIbkr() {
     [logActivity, reportError, refreshOpenOrders],
   );
 
+  const subscribeMarketDepth = useCallback(
+    async (spec: ContractSpec, rows: number) => {
+      try {
+        setDepthBook(null);
+        await invoke("subscribe_market_depth", { spec, rows });
+      } catch (e) {
+        reportError(String(e));
+      }
+    },
+    [reportError],
+  );
+
+  const unsubscribeMarketDepth = useCallback(async () => {
+    setDepthBook(null);
+    try {
+      await invoke("unsubscribe_market_depth");
+    } catch {
+      // best-effort cleanup
+    }
+  }, []);
+
   return {
     connection,
     connecting,
@@ -422,6 +468,7 @@ export function useIbkr() {
     openOrders,
     selectedAccount,
     pnl,
+    depthBook,
     lastError,
     activityLog,
     connect,
@@ -442,6 +489,9 @@ export function useIbkr() {
     getOptionSnapshot,
     fetchNews,
     fetchNewsArticle,
+    fetchExecutions,
     clearActivityLog,
+    subscribeMarketDepth,
+    unsubscribeMarketDepth,
   };
 }

@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { OrderConfirmDialog } from "./OrderConfirmDialog";
-import type { AlgoOptions, AlgoStrategy, ContractSpec, OrderSide, OrderType, OrderUpdate, Quote } from "../types";
+import type { AlgoOptions, AlgoStrategy, ContractSpec, OrderSide, OrderType, OrderUpdate, Quote, Settings } from "../types";
 
 interface OrderTicketProps {
   label: string | null;
   spec: ContractSpec | null;
   quote?: Quote;
   connected: boolean;
+  settings: Settings;
   onSubmit: (
     spec: ContractSpec,
     side: OrderSide,
@@ -35,15 +36,12 @@ const ALGO_STRATEGIES: { value: "NONE" | AlgoStrategy; label: string }[] = [
 ];
 
 // Simple heuristics to flag an order worth a second look before it's sent.
-const LARGE_NOTIONAL_THRESHOLD = 25000;
-const LARGE_QUANTITY_THRESHOLD = 10000;
-
-function buildWarning(quantity: number, notional: number | null): string | null {
+function buildWarning(quantity: number, notional: number | null, settings: Settings): string | null {
   const reasons: string[] = [];
-  if (notional != null && notional > LARGE_NOTIONAL_THRESHOLD) {
+  if (notional != null && notional > settings.largeNotionalThreshold) {
     reasons.push(`estimated value of ${notional.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 })}`);
   }
-  if (quantity > LARGE_QUANTITY_THRESHOLD) {
+  if (quantity > settings.largeQuantityThreshold) {
     reasons.push(`a quantity of ${quantity.toLocaleString()}`);
   }
   if (reasons.length === 0) return null;
@@ -63,9 +61,9 @@ interface PendingOrder {
   warning: string | null;
 }
 
-export function OrderTicket({ label, spec, quote, connected, onSubmit, orderLog }: OrderTicketProps) {
+export function OrderTicket({ label, spec, quote, connected, settings, onSubmit, orderLog }: OrderTicketProps) {
   const [side, setSide] = useState<OrderSide>("BUY");
-  const [quantity, setQuantity] = useState(100);
+  const [quantity, setQuantity] = useState(settings.defaultQuantity);
   const [orderType, setOrderType] = useState<OrderType>("MARKET");
   const [limitPrice, setLimitPrice] = useState<number | "">("");
   const [stopPrice, setStopPrice] = useState<number | "">("");
@@ -141,7 +139,7 @@ export function OrderTicket({ label, spec, quote, connected, onSubmit, orderLog 
       trailingPercent: trailing,
       algo,
       estimatedNotional,
-      warning: buildWarning(quantity, estimatedNotional),
+      warning: buildWarning(quantity, estimatedNotional, settings),
     });
   };
 

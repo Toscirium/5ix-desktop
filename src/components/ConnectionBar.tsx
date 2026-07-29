@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import type { Theme } from "../hooks/useTheme";
 import { loadJSON, saveJSON } from "../lib/storage";
 import { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
+import { SettingsDialog } from "./SettingsDialog";
 import { UpdateButton } from "./UpdateButton";
-import type { ConnectionStatus } from "../types";
+import type { ConnectionStatus, Settings } from "../types";
 
 const STORAGE_KEY = "5ix-connection-settings";
 
@@ -20,10 +21,12 @@ interface ConnectionBarProps {
   connecting: boolean;
   selectedAccount: string | null;
   theme: Theme;
+  settings: Settings;
   onConnect: (host: string, port: number, clientId: number) => void;
   onDisconnect: () => void;
   onSelectAccount: (account: string) => void;
   onToggleTheme: () => void;
+  onChangeSettings: (patch: Partial<Settings>) => void;
 }
 
 export function ConnectionBar({
@@ -31,15 +34,18 @@ export function ConnectionBar({
   connecting,
   selectedAccount,
   theme,
+  settings,
   onConnect,
   onDisconnect,
   onSelectAccount,
   onToggleTheme,
+  onChangeSettings,
 }: ConnectionBarProps) {
   const [host, setHost] = useState(() => loadJSON(STORAGE_KEY, DEFAULT_SETTINGS).host);
   const [port, setPort] = useState(() => loadJSON(STORAGE_KEY, DEFAULT_SETTINGS).port);
   const [clientId, setClientId] = useState(() => loadJSON(STORAGE_KEY, DEFAULT_SETTINGS).clientId);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     saveJSON(STORAGE_KEY, { host, port, clientId });
@@ -121,7 +127,13 @@ export function ConnectionBar({
       >
         ?
       </button>
+      <button className="theme-toggle" onClick={() => setShowSettings(true)} title="Settings" aria-label="Open settings">
+        ⚙
+      </button>
       {showShortcuts && <KeyboardShortcutsDialog onClose={() => setShowShortcuts(false)} />}
+      {showSettings && (
+        <SettingsDialog settings={settings} onChange={onChangeSettings} onClose={() => setShowSettings(false)} />
+      )}
     </header>
   );
 }

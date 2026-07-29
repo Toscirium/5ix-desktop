@@ -14,4 +14,5 @@ pub struct AppState {
     pub open_order_contracts: Mutex<HashMap<i32, Contract>>,
     pub selected_account: Mutex<Option<String>>,
     pub pnl_task: Mutex<Option<JoinHandle<()>>>,
+    pub depth_task: Mutex<Option<JoinHandle<()>>>,
 }
