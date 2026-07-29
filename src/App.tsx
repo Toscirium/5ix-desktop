@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import "./App.css";
 import { AccountSummaryPanel } from "./components/AccountSummaryPanel";
 import { ActivityLogPanel } from "./components/ActivityLogPanel";
@@ -21,6 +21,8 @@ import { useSettings } from "./hooks/useSettings";
 import { useTheme } from "./hooks/useTheme";
 import { useWatchlistGroups } from "./hooks/useWatchlistGroups";
 import { loadJSON, saveJSON } from "./lib/storage";
+import { isDetachedPanelId, openDetachedWindow } from "./lib/detachedWindows";
+import type { DetachedPanelId } from "./lib/detachedWindows";
 import { contractKey } from "./types";
 import type { ContractSpec, WatchlistItem } from "./types";
 
@@ -40,7 +42,26 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+function DetachablePanel({ panel, children }: { panel: DetachedPanelId; children: ReactNode }) {
+  return (
+    <section className="detachable-panel" data-panel={panel}>
+      <button
+        className="detach-panel-button"
+        type="button"
+        title="Open in a new window"
+        aria-label="Open panel in a new window"
+        onClick={() => void openDetachedWindow(panel)}
+      >
+        ↗
+      </button>
+      {children}
+    </section>
+  );
+}
+
 export default function App() {
+  const detachedPanelParam = new URLSearchParams(window.location.search).get("panel");
+  const detachedPanel = isDetachedPanelId(detachedPanelParam) ? detachedPanelParam : null;
   const { theme, toggleTheme } = useTheme();
   const {
     connection,
@@ -164,7 +185,7 @@ export default function App() {
   });
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-detached-panel={detachedPanel ?? undefined}>
       <ConnectionBar
         connection={connection}
         connecting={connecting}
@@ -183,7 +204,7 @@ export default function App() {
         style={{ gridTemplateColumns: `${panelWidths.left}px 5px 1fr 5px ${panelWidths.right}px` }}
       >
         <div className="col col-left">
-          <Watchlist
+          <DetachablePanel panel="watchlist"><Watchlist
             watchlist={watchlist}
             quotes={quotes}
             selectedKey={selected?.key ?? null}
@@ -199,50 +220,50 @@ export default function App() {
             onSelect={setSelected}
             onAdd={handleAddToWatchlist}
             onRemove={handleRemoveFromWatchlist}
-          />
-          <PositionsPanel
+          /></DetachablePanel>
+          <DetachablePanel panel="positions"><PositionsPanel
             positions={positions}
             connected={connection.connected}
             selectedAccount={selectedAccount}
             onRefresh={refreshPositions}
-          />
-          <AccountSummaryPanel
+          /></DetachablePanel>
+          <DetachablePanel panel="account"><AccountSummaryPanel
             accountSummary={accountSummary}
             pnl={pnl}
             connected={connection.connected}
             selectedAccount={selectedAccount}
             onRefresh={refreshAccountSummary}
-          />
-          <PriceAlertsPanel alerts={alerts} watchlist={visibleWatchlist} onAdd={addAlert} onRemove={removeAlert} />
+          /></DetachablePanel>
+          <DetachablePanel panel="alerts"><PriceAlertsPanel alerts={alerts} watchlist={visibleWatchlist} onAdd={addAlert} onRemove={removeAlert} /></DetachablePanel>
         </div>
         <ColumnResizer onResize={handleLeftResize} onResizeEnd={handleResizeEnd} />
         <div className="col col-center">
-          <PriceChart
+          <DetachablePanel panel="chart"><PriceChart
             label={selected?.label ?? null}
             spec={selected?.spec ?? null}
             connected={connection.connected}
             theme={theme}
             fetchHistoricalBars={fetchHistoricalBars}
-          />
-          <OpenOrdersPanel
+          /></DetachablePanel>
+          <DetachablePanel panel="orders"><OpenOrdersPanel
             openOrders={openOrders}
             connected={connection.connected}
             onRefresh={refreshOpenOrders}
             onCancel={cancelOrder}
             onModify={modifyOrder}
-          />
-          <TradeBlotterPanel connected={connection.connected} fetchExecutions={fetchExecutions} />
-          <NewsPanel
+          /></DetachablePanel>
+          <DetachablePanel panel="blotter"><TradeBlotterPanel connected={connection.connected} fetchExecutions={fetchExecutions} /></DetachablePanel>
+          <DetachablePanel panel="news"><NewsPanel
             label={selected?.label ?? null}
             spec={selected?.spec ?? null}
             connected={connection.connected}
             fetchNews={fetchNews}
             fetchNewsArticle={fetchNewsArticle}
-          />
+          /></DetachablePanel>
         </div>
         <ColumnResizer onResize={handleRightResize} onResizeEnd={handleResizeEnd} />
         <div className="col col-right">
-          <OrderTicket
+          <DetachablePanel panel="ticket"><OrderTicket
             label={selected?.label ?? null}
             spec={selected?.spec ?? null}
             quote={selected ? quotes[selected.key] : undefined}
@@ -250,10 +271,10 @@ export default function App() {
             settings={settings}
             onSubmit={placeOrder}
             orderLog={orderLog}
-          />
-          <MarketDepthPanel connected={connection.connected} symbolLabel={selected?.label ?? null} depthBook={depthBook} />
-          <ScannerPanel connected={connection.connected} onRun={runScanner} onAddToWatchlist={handleAddToWatchlist} />
-          <ActivityLogPanel activityLog={activityLog} onClear={clearActivityLog} />
+          /></DetachablePanel>
+          <DetachablePanel panel="depth"><MarketDepthPanel connected={connection.connected} symbolLabel={selected?.label ?? null} depthBook={depthBook} /></DetachablePanel>
+          <DetachablePanel panel="scanner"><ScannerPanel connected={connection.connected} onRun={runScanner} onAddToWatchlist={handleAddToWatchlist} /></DetachablePanel>
+          <DetachablePanel panel="activity"><ActivityLogPanel activityLog={activityLog} onClear={clearActivityLog} /></DetachablePanel>
         </div>
       </main>
     </div>

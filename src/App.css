@@ -428,27 +428,95 @@ body.resizing-columns {
   overflow: hidden;
 }
 
-.col-center .chart-panel {
+.col-center .detachable-panel[data-panel="chart"] {
   flex: 3 1 220px;
   min-height: 180px;
 }
 
-.col-center .open-orders-panel {
+.col-center .detachable-panel[data-panel="orders"] {
   flex: 1 1 120px;
-  overflow-y: auto;
   border-top: 1px solid var(--border);
 }
 
-.col-center .trade-blotter-panel {
+.col-center .detachable-panel[data-panel="blotter"] {
   flex: 1 1 120px;
-  overflow-y: auto;
   border-top: 1px solid var(--border);
 }
 
-.col-center .news-panel {
+.col-center .detachable-panel[data-panel="news"] {
   flex: 1 1 120px;
-  overflow-y: auto;
   border-top: 1px solid var(--border);
+}
+
+.detachable-panel {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.detachable-panel > .panel {
+  flex: 1;
+}
+
+.detach-panel-button {
+  position: absolute;
+  z-index: 1;
+  top: 5px;
+  right: 5px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.detach-panel-button:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+
+/* A detached Tauri webview loads the same app with ?panel=<id>. Keep only its
+   selected panel and let it use the entire workspace below the connection bar. */
+.app-shell[data-detached-panel] .app-grid {
+  display: block;
+  overflow: hidden;
+  background: var(--bg-1);
+}
+
+.app-shell[data-detached-panel] .col {
+  display: contents;
+}
+
+.app-shell[data-detached-panel] .col-resizer,
+.app-shell[data-detached-panel] .detachable-panel {
+  display: none;
+}
+
+.app-shell[data-detached-panel="watchlist"] .detachable-panel[data-panel="watchlist"],
+.app-shell[data-detached-panel="positions"] .detachable-panel[data-panel="positions"],
+.app-shell[data-detached-panel="account"] .detachable-panel[data-panel="account"],
+.app-shell[data-detached-panel="alerts"] .detachable-panel[data-panel="alerts"],
+.app-shell[data-detached-panel="chart"] .detachable-panel[data-panel="chart"],
+.app-shell[data-detached-panel="orders"] .detachable-panel[data-panel="orders"],
+.app-shell[data-detached-panel="blotter"] .detachable-panel[data-panel="blotter"],
+.app-shell[data-detached-panel="news"] .detachable-panel[data-panel="news"],
+.app-shell[data-detached-panel="ticket"] .detachable-panel[data-panel="ticket"],
+.app-shell[data-detached-panel="depth"] .detachable-panel[data-panel="depth"],
+.app-shell[data-detached-panel="scanner"] .detachable-panel[data-panel="scanner"],
+.app-shell[data-detached-panel="activity"] .detachable-panel[data-panel="activity"] {
+  display: flex;
+  height: 100%;
+}
+
+.app-shell[data-detached-panel] .detach-panel-button {
+  display: none;
 }
 
 /* Panels */
