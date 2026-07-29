@@ -13,6 +13,7 @@ export const DETACHABLE_PANELS = [
   "news",
   "ticket",
   "depth",
+  "tape",
   "scanner",
   "activity",
 ] as const;
@@ -51,6 +52,7 @@ export const PANEL_TITLES: Record<DetachedPanelId, string> = {
   news: "News",
   ticket: "Order Ticket",
   depth: "Market Depth",
+  tape: "Time & Sales",
   scanner: "Market Scanner",
   activity: "Activity Log",
 };
@@ -66,6 +68,7 @@ const WINDOW_OPTIONS: Record<DetachedPanelId, WindowOptions> = {
   news: { title: PANEL_TITLES.news, width: 800, height: 640 },
   ticket: { title: PANEL_TITLES.ticket, width: 500, height: 720 },
   depth: { title: PANEL_TITLES.depth, width: 600, height: 620 },
+  tape: { title: PANEL_TITLES.tape, width: 520, height: 640 },
   scanner: { title: PANEL_TITLES.scanner, width: 760, height: 660 },
   activity: { title: PANEL_TITLES.activity, width: 720, height: 560 },
 };

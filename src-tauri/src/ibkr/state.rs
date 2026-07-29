@@ -15,4 +15,5 @@ pub struct AppState {
     pub selected_account: Mutex<Option<String>>,
     pub pnl_task: Mutex<Option<JoinHandle<()>>>,
     pub depth_task: Mutex<Option<JoinHandle<()>>>,
+    pub tape_task: Mutex<Option<JoinHandle<()>>>,
 }

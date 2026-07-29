@@ -15,6 +15,7 @@ use super::contracts::{build_contract, ContractSpec};
 use super::dto::{
     AccountValueDto, BarDto, BracketOrderIdsDto, ConnectionStatusDto, DepthBookDto, DepthLevelDto, ExecutionDto, NewsArticleDto,
     OpenOrderDto, OptionChainDto, OptionSnapshotDto, OrderUpdateDto, PnlDto, PositionDto, QuoteDto, ScannerRowDto, SymbolMatchDto,
+    TradeTickDto,
 };
 use super::state::AppState;
 
@@ -163,6 +164,56 @@ pub async fn unsubscribe_market_depth(state: State<'_, AppState>) -> Result<(), 
 }
 
 #[tauri::command]
+pub async fn subscribe_time_and_sales(spec: ContractSpec, state: State<'_, AppState>, app: AppHandle) -> Result<(), String> {
+    let client = state.client.lock().await.clone().ok_or_else(|| "Not connected".to_string())?;
+    let contract = build_contract(&spec)?;
+
+    if let Some(handle) = state.tape_task.lock().await.take() {
+        handle.abort();
+    }
+
+    let app_handle = app.clone();
+    let handle = tokio::spawn(async move {
+        let subscription = match client.tick_by_tick(&contract, 0).all_last().await {
+            Ok(s) => s,
+            Err(e) => {
+                let _ = app_handle.emit("tape-error", e.to_string());
+                return;
+            }
+        };
+
+        let mut subscription = subscription.filter_data();
+        while let Some(result) = subscription.next().await {
+            let trade = match result {
+                Ok(trade) => trade,
+                Err(_) => break,
+            };
+            let dto = TradeTickDto {
+                time: trade.time.unix_timestamp(),
+                price: trade.price,
+                size: trade.size,
+                exchange: trade.exchange,
+                special_conditions: trade.special_conditions,
+                past_limit: trade.trade_attribute.past_limit,
+                unreported: trade.trade_attribute.unreported,
+            };
+            let _ = app_handle.emit("tape-update", &dto);
+        }
+    });
+
+    *state.tape_task.lock().await = Some(handle);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn unsubscribe_time_and_sales(state: State<'_, AppState>) -> Result<(), String> {
+    if let Some(handle) = state.tape_task.lock().await.take() {
+        handle.abort();
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn ibkr_disconnect(state: State<'_, AppState>, app: AppHandle) -> Result<(), String> {
     let mut tasks = state.watchlist_tasks.lock().await;
     for (_, handle) in tasks.drain() {
@@ -177,6 +228,9 @@ pub async fn ibkr_disconnect(state: State<'_, AppState>, app: AppHandle) -> Resu
         handle.abort();
     }
     if let Some(handle) = state.depth_task.lock().await.take() {
+        handle.abort();
+    }
+    if let Some(handle) = state.tape_task.lock().await.take() {
         handle.abort();
     }
 

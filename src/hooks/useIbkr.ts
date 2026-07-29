@@ -28,6 +28,7 @@ import type {
   Quote,
   ScannerRow,
   SymbolMatch,
+  TradeTick,
   WatchlistItem,
 } from "../types";
 
@@ -48,6 +49,7 @@ export function useIbkr() {
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [pnl, setPnl] = useState<Pnl | null>(null);
   const [depthBook, setDepthBook] = useState<DepthBook | null>(null);
+  const [tape, setTape] = useState<TradeTick[]>([]);
   const [lastError, setLastError] = useState<string | null>(null);
   const [activityLog, setActivityLog] = useState<ActivityEntry[]>([]);
 
@@ -107,6 +109,8 @@ export function useIbkr() {
       listen<string>("pnl-error", (event) => reportError(event.payload)),
       listen<DepthBook>("depth-update", (event) => setDepthBook(event.payload)),
       listen<string>("depth-error", (event) => reportError(event.payload)),
+      listen<TradeTick>("tape-update", (event) => setTape((prev) => [event.payload, ...prev].slice(0, 200))),
+      listen<string>("tape-error", (event) => reportError(event.payload)),
     ];
 
     return () => {
@@ -217,6 +221,7 @@ export function useIbkr() {
       setSelectedAccount(null);
       setPnl(null);
       setDepthBook(null);
+      setTape([]);
     }
   }, [logActivity, reportError]);
 
@@ -482,6 +487,27 @@ export function useIbkr() {
     }
   }, []);
 
+  const subscribeTimeAndSales = useCallback(
+    async (spec: ContractSpec) => {
+      try {
+        setTape([]);
+        await invoke("subscribe_time_and_sales", { spec });
+      } catch (e) {
+        reportError(String(e));
+      }
+    },
+    [reportError],
+  );
+
+  const unsubscribeTimeAndSales = useCallback(async () => {
+    setTape([]);
+    try {
+      await invoke("unsubscribe_time_and_sales");
+    } catch {
+      // best-effort cleanup
+    }
+  }, []);
+
   return {
     connection,
     connecting,
@@ -494,6 +520,7 @@ export function useIbkr() {
     selectedAccount,
     pnl,
     depthBook,
+    tape,
     lastError,
     activityLog,
     connect,
@@ -519,5 +546,7 @@ export function useIbkr() {
     clearActivityLog,
     subscribeMarketDepth,
     unsubscribeMarketDepth,
+    subscribeTimeAndSales,
+    unsubscribeTimeAndSales,
   };
 }

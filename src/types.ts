@@ -87,6 +87,16 @@ export interface Settings {
   notificationsEnabled: boolean;
 }
 
+export interface TradeTick {
+  time: number;
+  price: number;
+  size: number;
+  exchange: string;
+  specialConditions: string;
+  pastLimit: boolean;
+  unreported: boolean;
+}
+
 export interface BracketOrderIds {
   parentId: number;
   takeProfitId: number;

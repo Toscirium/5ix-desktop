@@ -138,6 +138,18 @@ pub struct DepthBookDto {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TradeTickDto {
+    pub time: i64,
+    pub price: f64,
+    pub size: f64,
+    pub exchange: String,
+    pub special_conditions: String,
+    pub past_limit: bool,
+    pub unreported: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BracketOrderIdsDto {
     pub parent_id: i32,
     pub take_profit_id: i32,

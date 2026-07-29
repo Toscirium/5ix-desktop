@@ -13,6 +13,7 @@ import { PositionsPanel } from "./components/PositionsPanel";
 import { PriceAlertsPanel } from "./components/PriceAlertsPanel";
 import { PriceChart } from "./components/PriceChart";
 import { ScannerPanel } from "./components/ScannerPanel";
+import { TimeSalesPanel } from "./components/TimeSalesPanel";
 import { TradeBlotterPanel } from "./components/TradeBlotterPanel";
 import { Watchlist } from "./components/Watchlist";
 import { useIbkr } from "./hooks/useIbkr";
@@ -80,6 +81,7 @@ export default function App() {
     selectedAccount,
     pnl,
     depthBook,
+    tape,
     lastError,
     activityLog,
     connect,
@@ -105,6 +107,8 @@ export default function App() {
     clearActivityLog,
     subscribeMarketDepth,
     unsubscribeMarketDepth,
+    subscribeTimeAndSales,
+    unsubscribeTimeAndSales,
   } = useIbkr();
 
   const { groups, activeGroup, selectGroup, addGroup, removeGroup, addKeyToActiveGroup, removeKeyFromActiveGroup } =
@@ -170,6 +174,15 @@ export default function App() {
     subscribeMarketDepth(selected.spec, 10);
     return () => {
       unsubscribeMarketDepth();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connection.connected, selected?.key]);
+
+  useEffect(() => {
+    if (!connection.connected || !selected) return;
+    subscribeTimeAndSales(selected.spec);
+    return () => {
+      unsubscribeTimeAndSales();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connection.connected, selected?.key]);
@@ -306,6 +319,7 @@ export default function App() {
             orderLog={orderLog}
           /></DetachablePanel>
           <DetachablePanel panel="depth" context={detachedWindowContext} onError={handleWindowError}><MarketDepthPanel connected={connection.connected} symbolLabel={selected?.label ?? null} depthBook={depthBook} /></DetachablePanel>
+          <DetachablePanel panel="tape" context={detachedWindowContext} onError={handleWindowError}><TimeSalesPanel connected={connection.connected} symbolLabel={selected?.label ?? null} tape={tape} /></DetachablePanel>
           <DetachablePanel panel="scanner" context={detachedWindowContext} onError={handleWindowError}><ScannerPanel connected={connection.connected} onRun={runScanner} onAddToWatchlist={handleAddToWatchlist} /></DetachablePanel>
           <DetachablePanel panel="activity" context={detachedWindowContext} onError={handleWindowError}><ActivityLogPanel activityLog={activityLog} onClear={clearActivityLog} /></DetachablePanel>
         </div>

@@ -572,6 +572,7 @@ body.resizing-columns {
 .app-shell[data-detached-panel="news"] .detachable-panel[data-panel="news"],
 .app-shell[data-detached-panel="ticket"] .detachable-panel[data-panel="ticket"],
 .app-shell[data-detached-panel="depth"] .detachable-panel[data-panel="depth"],
+.app-shell[data-detached-panel="tape"] .detachable-panel[data-panel="tape"],
 .app-shell[data-detached-panel="scanner"] .detachable-panel[data-panel="scanner"],
 .app-shell[data-detached-panel="activity"] .detachable-panel[data-panel="activity"] {
   display: flex;
