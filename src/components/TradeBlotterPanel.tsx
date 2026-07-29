@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { downloadCsv, toCsv } from "../lib/csv";
 import type { Execution } from "../types";
 
 interface TradeBlotterPanelProps {
@@ -40,6 +41,14 @@ export function TradeBlotterPanel({ connected, fetchExecutions }: TradeBlotterPa
     if (connected) refresh(range);
   };
 
+  const exportCsv = () => {
+    const csv = toCsv(
+      ["Time", "Symbol", "Side", "Shares", "Price", "Commission", "Exchange"],
+      executions.map((e) => [e.time, e.symbol, e.side, e.shares, e.price, e.commission ?? "", e.exchange]),
+    );
+    downloadCsv(csv, `trade-blotter-${days}d-${new Date().toISOString().slice(0, 10)}.csv`);
+  };
+
   return (
     <div className="panel trade-blotter-panel">
       <div className="panel-header">
@@ -56,6 +65,9 @@ export function TradeBlotterPanel({ connected, fetchExecutions }: TradeBlotterPa
           ))}
           <button className="btn-icon" onClick={() => refresh(days)} disabled={!connected || loading} title="Refresh">
             ⟳
+          </button>
+          <button className="btn-icon" onClick={exportCsv} disabled={executions.length === 0} title="Export CSV">
+            ⇩
           </button>
         </div>
       </div>

@@ -539,6 +539,12 @@ body.resizing-columns {
   color: var(--text-0);
 }
 
+/* Reserve room so header controls never render under the absolutely
+   positioned detach button in the top-right corner. */
+.detachable-panel .panel-header {
+  padding-right: 34px;
+}
+
 /* A detached Tauri webview loads the same app with ?panel=<id>. Keep only its
    selected panel and let it use the entire workspace below the connection bar. */
 .app-shell[data-detached-panel] .app-grid {
