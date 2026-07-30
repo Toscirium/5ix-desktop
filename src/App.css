@@ -212,6 +212,63 @@ body,
   opacity: 0.5;
 }
 
+/* Compact connection bar — used in detached panel windows so a floating
+   status square replaces the full toolbar; click it to reveal the same
+   controls in a popover. */
+.connection-bar-compact {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 50;
+}
+
+.connection-bar-popover {
+  position: relative;
+}
+
+.connection-bar-dot {
+  display: block;
+  list-style: none;
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  background: var(--text-2);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-1);
+}
+
+.connection-bar-dot::-webkit-details-marker {
+  display: none;
+}
+
+.connection-bar-dot-live {
+  background: var(--up);
+  box-shadow: 0 0 6px 1px rgba(52, 199, 149, 0.65);
+}
+
+.connection-bar-popover[open] .connection-bar-dot {
+  border-color: var(--accent);
+}
+
+.connection-bar-popover-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: 480px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-1);
+  box-shadow: var(--shadow-2);
+}
+
 .window-menu {
   position: relative;
   flex-shrink: 0;

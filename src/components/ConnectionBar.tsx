@@ -24,6 +24,7 @@ interface ConnectionBarProps {
   selectedAccount: string | null;
   theme: Theme;
   settings: Settings;
+  compact?: boolean;
   onConnect: (host: string, port: number, clientId: number) => void;
   onDisconnect: () => void;
   onSelectAccount: (account: string) => void;
@@ -38,6 +39,7 @@ export function ConnectionBar({
   selectedAccount,
   theme,
   settings,
+  compact = false,
   onConnect,
   onDisconnect,
   onSelectAccount,
@@ -55,8 +57,8 @@ export function ConnectionBar({
     saveJSON(STORAGE_KEY, { host, port, clientId });
   }, [host, port, clientId]);
 
-  return (
-    <header className="connection-bar">
+  const controls = (
+    <>
       <div className="brand">
         <span className="brand-dot" />
         <span className="brand-word">
@@ -144,10 +146,38 @@ export function ConnectionBar({
       <button className="theme-toggle" onClick={() => setShowSettings(true)} title="Settings" aria-label="Open settings">
         ⚙
       </button>
+    </>
+  );
+
+  const dialogs = (
+    <>
       {showShortcuts && <KeyboardShortcutsDialog onClose={() => setShowShortcuts(false)} />}
       {showSettings && (
         <SettingsDialog settings={settings} onChange={onChangeSettings} onClose={() => setShowSettings(false)} />
       )}
+    </>
+  );
+
+  if (compact) {
+    return (
+      <div className="connection-bar-compact">
+        <details className="connection-bar-popover">
+          <summary
+            className={connection.connected ? "connection-bar-dot connection-bar-dot-live" : "connection-bar-dot"}
+            title={connection.connected ? "Connected — click for connection controls" : "Disconnected — click for connection controls"}
+            aria-label="Connection controls"
+          />
+          <div className="connection-bar-popover-panel">{controls}</div>
+        </details>
+        {dialogs}
+      </div>
+    );
+  }
+
+  return (
+    <header className="connection-bar">
+      {controls}
+      {dialogs}
     </header>
   );
 }

@@ -235,6 +235,7 @@ export default function App() {
         selectedAccount={selectedAccount}
         theme={theme}
         settings={settings}
+        compact={!!detachedPanel}
         onConnect={connect}
         onDisconnect={disconnect}
         onSelectAccount={selectAccount}
